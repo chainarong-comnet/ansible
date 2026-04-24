@@ -1,0 +1,101 @@
+- hosts: all
+  serial: 1
+  collections:
+    - arubanetworks.aoscx
+  gather_facts: False
+#  vars:
+#    ansible_connection: network_cli
+#    ansible_persistent_connect_timeout: 1
+  tasks:
+    - name: Init failed_tasks list
+      set_fact:
+        failed_tasks: []
+        
+    - name: Get Date & Time on the switch
+      tags: date
+      aoscx_command:
+        commands: ['show clock']
+      register: clock
+      ignore_errors: true
+      failed_when: >
+        'ssh connect failed' in (clock.stdout | join(' ') | default('')) or 
+        'Failed to authenticate' in (clock.stdout | join(' ') | default(''))
+      
+    - name: Record failed
+      set_fact:
+        failed_tasks: "{{ failed_tasks | default([]) + [ {
+          'host': inventory_hostname,
+          'task': 'show clock',
+          'error': (clock.msg | default('')) or (clock.stdout | join(' ')| default('')) or 'command failed'
+        } ] }}"
+      when: clock is failed
+      
+    - name: Generate error log per host
+      delegate_to: localhost
+      copy:
+        content: |
+          {% for task in failed_tasks %}
+          Host: {{ task.host }}
+          Task: {{ task.task }}
+          Error: {{ task.error }}
+          -------------------------
+          {% endfor %}
+        dest: "/home/chai/Desktop/ansible/aruba/log/{{ inventory_hostname }}-log-failed.txt"
+      when: failed_tasks | length > 0
+      
+    - name: Stop failed 
+      meta: end_host
+      when: clock is failed
+         
+    - name: Execute show run on the switch
+      aoscx_command:
+        commands: ['show run']
+      register: config
+    - name: Execute show system on the switch
+      aoscx_command:
+        commands: ['show system']
+      register: system
+    - name: Execute show Serial Number on the switch
+      aoscx_command:
+        commands: ['show system inventory chassis']
+      register: serial
+    - name: Execute show IP MGMT on the switch
+      aoscx_command:
+        commands: ['show ip interface brief']
+      register: ipmgmt
+    - name: Execute show Fan Status on the switch
+      aoscx_command:
+        commands: ['show environment fan']
+      register: fan
+    - name: Execute show Power Supply Status on the switch
+      aoscx_command:
+        commands: ['show environment power-supply']
+      register: psu
+    - name: Execute show Temperature on the switch
+      aoscx_command:
+        commands: ['show environment temp']
+      register: temp
+    - name: Execute show Interface Status on the switch
+      aoscx_command:
+        commands: ['show interface brief']
+      register: intbrief
+    - name: Execute show Vlan Database on the switch
+      aoscx_command:
+        commands: ['show vlan']
+      register: vlan
+    - name: Execute show Mac Address Table Count on the switch
+      aoscx_command:
+        commands: ['show mac-address-table count']
+      register: mac
+    - name: Execute show Total Route count on the switch
+      aoscx_command:
+        commands: ['show ip route summary']
+      register: route
+    - name: Execute show LLDP Neightbor on the switch
+      aoscx_command:
+        commands: ['show lldp neighbor-info detail']
+      register: lldp
+    - name: Generate Report
+      template:
+        src: arubareport.j2
+        dest: "/home/chai/Desktop/ansible/aruba/report/{{inventory_hostname}}-config.txt"

@@ -1,0 +1,39 @@
+namespace: "arubanetworks"
+
+name: "aoscx"
+
+version: "4.3.2"
+
+authors:
+  - "Madhusudan Pranav Venugopal"
+  - "Tiffany Chiapuzio-Wong"
+  - "Yang Liu"
+  - "Derek Wang"
+  - "Melvin Gutierrez"
+  - "Rodrigo Jose Hernandez"
+  - "Daniel Alvarado Bonilla"
+  - "David Cordero"
+
+dependencies:
+    "ansible.netcommon": "*"
+
+description:
+
+license: "Apache-2.0"
+
+tags: [
+  networking,
+  aruba,
+  arubaoscx,
+  aoscx,
+  switch,
+  switches,
+  hpe,
+  datacenter
+]
+
+repository: https://github.com/aruba/aoscx-ansible-collection
+
+issues: https://github.com/aruba/aoscx-ansible-collection/issues
+
+readme: "README.md"
