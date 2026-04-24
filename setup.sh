@@ -5,14 +5,28 @@
 # Exit on any error
 set -e
 
-# Install Docker if not installed
+# Install Docker CLI if not installed
 if ! command -v docker &> /dev/null
 then
-    echo "Docker not found. Installing Docker..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    rm get-docker.sh
-    echo "Docker installed successfully."
+    echo "Docker CLI not found. Installing Docker CLI..."
+
+    # Download Docker CLI binary
+    DOCKER_CLI_VERSION="20.10.24"
+    curl -L "https://download.docker.com/win/static/stable/x86_64/docker-${DOCKER_CLI_VERSION}.zip" -o docker-cli.zip
+
+    # Extract and move Docker CLI to PATH
+    unzip docker-cli.zip -d docker-cli
+    sudo mv docker-cli/docker.exe /usr/local/bin/docker
+    rm -rf docker-cli docker-cli.zip
+
+    echo "Docker CLI installed successfully."
+fi
+
+# Ensure Docker Daemon is accessible
+if ! docker info &> /dev/null
+then
+    echo "Docker Daemon not accessible. Please ensure Docker Daemon is running on WSL or a remote host."
+    exit 1
 fi
 
 # Install Docker Compose if not installed
