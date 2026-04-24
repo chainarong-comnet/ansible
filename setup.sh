@@ -1,61 +1,137 @@
 #!/bin/bash
 
 # Full setup script for Ansible Dockerized Environment
+# Based on: https://dev.to/julianlasso/how-to-install-docker-cli-on-windows-without-docker-desktop-and-not-die-trying-4033
+# Designed to run inside WSL2 (Ubuntu)
 
 # Exit on any error
 set -e
 
-# Install Docker CLI if not installed
-if ! command -v docker &> /dev/null
-then
-    echo "Docker CLI not found. Installing Docker CLI..."
+# ─────────────────────────────────────────────
+# 1. Install Docker CE via apt (no Docker Desktop needed)
+# ─────────────────────────────────────────────
+if ! command -v docker &> /dev/null; then
+    echo ">>> Docker not found. Installing Docker CE via apt..."
 
-    # Download Docker CLI binary
-    DOCKER_CLI_VERSION="20.10.24"
-    curl -L "https://download.docker.com/win/static/stable/x86_64/docker-${DOCKER_CLI_VERSION}.zip" -o docker-cli.zip
+    # Install prerequisites
+    sudo apt-get update -y
+    sudo apt-get install -y \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release
 
-    # Extract and move Docker CLI to PATH
-    unzip docker-cli.zip -d docker-cli
-    sudo mv docker-cli/docker/docker.exe /usr/local/bin/docker
-    rm -rf docker-cli docker-cli.zip
+    # Add Docker's official GPG key
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+        | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 
-    echo "Docker CLI installed successfully."
+    # Add Docker apt repository
+    echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
+        https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+        | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    # Install Docker CE + Compose plugin
+    sudo apt-get update -y
+    sudo apt-get install -y \
+        docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin \
+        docker-compose
+
+    echo ">>> Docker CE installed successfully."
+else
+    echo ">>> Docker already installed: $(docker --version)"
 fi
 
-# Ensure Docker Daemon is accessible
-if ! docker info &> /dev/null
-then
-    echo "Docker Daemon not accessible. Please ensure Docker Daemon is running on WSL or a remote host."
+# ─────────────────────────────────────────────
+# 2. Add current user to docker group (run without sudo)
+# ─────────────────────────────────────────────
+if ! groups "$USER" | grep -q '\bdocker\b'; then
+    echo ">>> Adding $USER to docker group..."
+    sudo groupadd docker 2>/dev/null || true
+    sudo usermod -aG docker "$USER"
+    echo ">>> User added to docker group. You may need to log out and back in (or run 'newgrp docker')."
+else
+    echo ">>> $USER is already in the docker group."
+fi
+
+# ─────────────────────────────────────────────
+# 3. Start Docker daemon
+# ─────────────────────────────────────────────
+if ! sudo service docker status &> /dev/null; then
+    echo ">>> Starting Docker daemon..."
+    sudo service docker start
+else
+    echo ">>> Docker daemon is already running."
+fi
+
+# Verify Docker daemon is accessible
+if ! docker info &> /dev/null; then
+    echo "ERROR: Docker daemon is not accessible. Try running 'newgrp docker' or log out and back in."
     exit 1
 fi
 
-# Install Docker Compose if not installed
-if ! command -v docker-compose &> /dev/null
-then
-    echo "Docker Compose not found. Installing Docker Compose..."
-    DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d '"' -f 4)
-    curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-    echo "Docker Compose installed successfully."
+echo ">>> Docker daemon is accessible."
+
+# ─────────────────────────────────────────────
+# 4. Auto-start Docker on WSL session open
+#    (adds to ~/.profile so Docker starts automatically)
+# ─────────────────────────────────────────────
+PROFILE_SNIPPET='# Auto-start Docker daemon in WSL
+if grep -q "\-WSL" /proc/version 2>/dev/null; then
+    if service docker status 2>&1 | grep -q "not running"; then
+        sudo service docker start > /dev/null 2>&1
+    fi
+fi'
+
+if ! grep -q "Auto-start Docker daemon in WSL" ~/.profile 2>/dev/null; then
+    echo ">>> Adding Docker auto-start to ~/.profile..."
+    echo "" >> ~/.profile
+    echo "$PROFILE_SNIPPET" >> ~/.profile
+    echo ">>> Done. Docker will start automatically on next WSL session."
 fi
 
-# Clone the repository (replace with your repository URL)
-REPO_URL="<your-repo-url>"
-if [ ! -d "ansible" ]; then
-  echo "Cloning repository..."
-  git clone "$REPO_URL" ansible
+# ─────────────────────────────────────────────
+# 5. Clone the Ansible repository
+# ─────────────────────────────────────────────
+REPO_URL="https://github.com/chainarong-comnet/ansible"   # <-- Replace with your actual repo URL
+
+if [ "$REPO_URL" = "<your-repo-url>" ]; then
+    echo "WARNING: REPO_URL is not set. Skipping git clone."
+    echo "         Edit this script and set REPO_URL to your repository."
+elif [ ! -d "ansible" ]; then
+    echo ">>> Cloning repository..."
+    git clone "$REPO_URL" ansible
+else
+    echo ">>> Repository already cloned."
 fi
 
-cd ansible
+# ─────────────────────────────────────────────
+# 6. Build Docker image and start services
+# ─────────────────────────────────────────────
+if [ -d "ansible" ]; then
+    cd ansible
 
-# Build the Docker image
-echo "Building Docker image..."
-docker build -t ansible-env .
+    echo ">>> Building Docker image..."
+    docker build -t ansible-env .
 
-# Install dependencies using docker-compose
-echo "Setting up Docker Compose..."
-docker compose up --no-start
+    echo ">>> Setting up Docker Compose..."
+    docker compose up --no-start
 
-# Instructions for running playbooks
-echo "Setup complete. To run a playbook, use the following command:"
-echo "./run.sh <playbook.yml>"
+    cd ..
+fi
+
+# ─────────────────────────────────────────────
+echo ""
+echo "✅ Setup complete!"
+echo ""
+echo "To run a playbook:"
+echo "  ./run.sh <playbook.yml>"
+echo ""
+echo "NOTE: If you see permission errors with Docker, run:"
+echo "  newgrp docker"
+echo "or open a new WSL terminal session."
