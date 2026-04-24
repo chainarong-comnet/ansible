@@ -16,7 +16,7 @@ then
 
     # Extract and move Docker CLI to PATH
     unzip docker-cli.zip -d docker-cli
-    sudo mv docker-cli/docker.exe /usr/local/bin/docker
+    sudo mv docker-cli/docker/docker.exe /usr/local/bin/docker
     rm -rf docker-cli docker-cli.zip
 
     echo "Docker CLI installed successfully."
