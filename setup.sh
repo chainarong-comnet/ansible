@@ -4,25 +4,47 @@
 # Based on: https://dev.to/julianlasso/how-to-install-docker-cli-on-windows-without-docker-desktop-and-not-die-trying-4033
 # Designed to run inside WSL2 (Ubuntu)
 
-# Exit on any error
 set -e
 
-# ─────────────────────────────────────────────
-# 1. Install Docker CE via apt (no Docker Desktop needed)
-# ─────────────────────────────────────────────
-if ! command -v docker &> /dev/null; then
-    echo ">>> Docker not found. Installing Docker CE via apt..."
+REPO_URL="https://github.com/chainarong-comnet/ansible.git"
+REPO_DIR="ansible"
 
-    # Install prerequisites
+# ─────────────────────────────────────────────
+# 1. ลบ Docker เก่าที่อาจเป็น Windows binary ออก
+# ─────────────────────────────────────────────
+echo ">>> Cleaning up old/stale Docker binaries..."
+sudo apt-get remove -y docker docker-engine docker.io containerd runc docker-compose 2>/dev/null || true
+
+# ลบ binary ที่ไม่ใช่ของ apt (เช่น Windows CLI ที่ copy มา)
+for bin in /usr/local/bin/docker /usr/local/bin/docker-compose; do
+    if [ -f "$bin" ] && ! dpkg -S "$bin" &>/dev/null 2>&1; then
+        echo ">>> Removing unmanaged binary: $bin"
+        sudo rm -f "$bin"
+    fi
+done
+
+# รีเซ็ต PATH cache
+hash -r
+
+# ─────────────────────────────────────────────
+# 2. ติดตั้ง Docker CE จาก official apt repository
+# ─────────────────────────────────────────────
+if command -v dockerd &>/dev/null && command -v docker &>/dev/null; then
+    echo ">>> Docker CE already installed: $(docker --version)"
+else
+    echo ">>> Installing Docker CE via apt..."
+
     sudo apt-get update -y
     sudo apt-get install -y \
         apt-transport-https \
         ca-certificates \
         curl \
         gnupg \
-        lsb-release
+        lsb-release \
+        git
 
-    # Add Docker's official GPG key
+    # Add Docker GPG key
+    sudo mkdir -p /usr/share/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
         | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 
@@ -32,106 +54,102 @@ if ! command -v docker &> /dev/null; then
         https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
         | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-    # Install Docker CE + Compose plugin
     sudo apt-get update -y
     sudo apt-get install -y \
         docker-ce \
         docker-ce-cli \
         containerd.io \
         docker-buildx-plugin \
-        docker-compose-plugin \
-        docker-compose
+        docker-compose-plugin
 
-    echo ">>> Docker CE installed successfully."
-else
-    echo ">>> Docker already installed: $(docker --version)"
+    echo ">>> Docker CE installed: $(docker --version)"
 fi
 
 # ─────────────────────────────────────────────
-# 2. Add current user to docker group (run without sudo)
+# 3. เพิ่ม user เข้า docker group
 # ─────────────────────────────────────────────
 if ! groups "$USER" | grep -q '\bdocker\b'; then
     echo ">>> Adding $USER to docker group..."
     sudo groupadd docker 2>/dev/null || true
     sudo usermod -aG docker "$USER"
-    echo ">>> User added to docker group. You may need to log out and back in (or run 'newgrp docker')."
+    echo ">>> Done. (จะมีผลเมื่อเปิด terminal ใหม่ หรือรัน: newgrp docker)"
 else
     echo ">>> $USER is already in the docker group."
 fi
 
 # ─────────────────────────────────────────────
-# 3. Start Docker daemon
+# 4. Start Docker daemon (WSL2-compatible)
 # ─────────────────────────────────────────────
-if ! sudo service docker status &> /dev/null; then
-    echo ">>> Starting Docker daemon..."
-    sudo service docker start
+echo ">>> Checking Docker daemon..."
+
+if ! pgrep -x dockerd > /dev/null 2>&1; then
+    echo ">>> Starting Docker daemon via service..."
+    sudo service docker start 2>/dev/null || {
+        echo ">>> service failed, starting dockerd directly..."
+        sudo dockerd > /tmp/dockerd.log 2>&1 &
+        for i in $(seq 1 15); do
+            sleep 1
+            docker info &>/dev/null && break
+        done
+    }
 else
     echo ">>> Docker daemon is already running."
 fi
 
-# Verify Docker daemon is accessible
-if ! docker info &> /dev/null; then
-    echo "ERROR: Docker daemon is not accessible. Try running 'newgrp docker' or log out and back in."
+if ! docker info &>/dev/null; then
+    echo "ERROR: Docker daemon is not accessible."
+    echo "       ลองรัน: newgrp docker แล้วรัน script ใหม่"
     exit 1
 fi
 
 echo ">>> Docker daemon is accessible."
 
 # ─────────────────────────────────────────────
-# 4. Auto-start Docker on WSL session open
-#    (adds to ~/.profile so Docker starts automatically)
+# 5. Auto-start Docker เมื่อเปิด WSL terminal
 # ─────────────────────────────────────────────
-PROFILE_SNIPPET='# Auto-start Docker daemon in WSL
-if grep -q "\-WSL" /proc/version 2>/dev/null; then
-    if service docker status 2>&1 | grep -q "not running"; then
-        sudo service docker start > /dev/null 2>&1
-    fi
-fi'
-
 if ! grep -q "Auto-start Docker daemon in WSL" ~/.profile 2>/dev/null; then
     echo ">>> Adding Docker auto-start to ~/.profile..."
-    echo "" >> ~/.profile
-    echo "$PROFILE_SNIPPET" >> ~/.profile
-    echo ">>> Done. Docker will start automatically on next WSL session."
+    cat >> ~/.profile << 'EOF'
+
+# Auto-start Docker daemon in WSL
+if grep -qi "microsoft\|wsl" /proc/version 2>/dev/null; then
+    if ! pgrep -x dockerd > /dev/null 2>&1; then
+        sudo service docker start > /dev/null 2>&1 || true
+    fi
+fi
+EOF
+    echo ">>> Done."
 fi
 
 # ─────────────────────────────────────────────
-# 5. Clone the Ansible repository
+# 6. Clone Ansible repository
 # ─────────────────────────────────────────────
-REPO_URL="https://github.com/chainarong-comnet/ansible"   # <-- Replace with your actual repo URL
-
-if [ "$REPO_URL" = "<your-repo-url>" ]; then
-    echo "WARNING: REPO_URL is not set. Skipping git clone."
-    echo "         Edit this script and set REPO_URL to your repository."
-elif [ ! -d "ansible" ]; then
-    echo ">>> Cloning repository..."
-    git clone "$REPO_URL" ansible
+if [ ! -d "$REPO_DIR" ]; then
+    echo ">>> Cloning $REPO_URL ..."
+    git clone "$REPO_URL" "$REPO_DIR"
 else
-    echo ">>> Repository already cloned."
+    echo ">>> Repository already exists, pulling latest..."
+    git -C "$REPO_DIR" pull
 fi
 
 # ─────────────────────────────────────────────
-# 6. Build Docker image and start services
+# 7. Build Docker image และ setup Compose
 # ─────────────────────────────────────────────
-if [ -d "ansible" ]; then
-    cd ansible
+cd "$REPO_DIR"
 
-    echo ">>> Building Docker image..."
-    docker build -t ansible-env .
+echo ">>> Building Docker image..."
+docker build -t ansible-env .
 
-    echo ">>> Setting up Docker Compose..."
-    docker compose up --no-start
+echo ">>> Setting up Docker Compose services..."
+docker compose up --no-start
 
-    cd ..
-fi
+cd ..
 
 # ─────────────────────────────────────────────
 echo ""
 echo "✅ Setup complete!"
 echo ""
 echo "To run a playbook:"
-echo "  ./run.sh <playbook.yml>"
+echo "  cd $REPO_DIR && ./run.sh <playbook.yml>"
 echo ""
-echo "NOTE: If you see permission errors with Docker, run:"
-echo "  newgrp docker"
-echo "or open a new WSL terminal session."
+echo "NOTE: ถ้าเจอ permission error ให้รัน: newgrp docker"
