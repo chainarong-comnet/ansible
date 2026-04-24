@@ -1,0 +1,15 @@
+# docker-compose.yml for Ansible service
+version: '3.8'
+
+services:
+  ansible:
+    image: ansible-env:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/ansible
+      - ~/.ssh:/root/.ssh
+    working_dir: /ansible
+    stdin_open: true
+    tty: true
