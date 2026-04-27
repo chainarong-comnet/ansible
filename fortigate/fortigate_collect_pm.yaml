@@ -135,12 +135,3 @@
        content: '{{ backup_config.meta.raw }}'
        dest: "/ansible/fortigate/backup/{{ inventory_hostname }}-config.cfg"
        
-   - name: Run Python script
-     ansible.builtin.command: python3 /ansible/fortigate/process.py {{ inventory_hostname }}
-     register: result
-     run_once: true
-     
-   - name: show output python
-     run_once: true
-     debug:
-       msg: "{{result.stdout}}"
