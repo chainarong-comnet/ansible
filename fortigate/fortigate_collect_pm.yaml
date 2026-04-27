@@ -81,10 +81,6 @@
        vdom: "{{ vdom }}"
        selector: system_interface
      register: test
-
-   - name : Debug Interface
-     debug:
-       msg: "{{test}}"
     
    - name: Get NTP status
      fortinet.fortios.fortios_monitor_fact:
