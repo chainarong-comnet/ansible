@@ -32,7 +32,7 @@
        selector: system_status
      register: status
      
-   - name: Test get uptime
+   - name: Get uptime
      fortinet.fortios.fortios_json_generic:
        vdom: "{{ vdom }}"
        json_generic:
@@ -75,12 +75,6 @@
        vdom: "{{ vdom }}"
        selector: system_available-interfaces
      register: interface
-   
-   - name: Get Test
-     fortinet.fortios.fortios_monitor_fact:
-       vdom: "{{ vdom }}"
-       selector: system_interface
-     register: test
     
    - name: Get NTP status
      fortinet.fortios.fortios_monitor_fact:
