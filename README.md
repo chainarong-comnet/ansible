@@ -110,7 +110,7 @@ cd ansible
 **Flow การทำงาน:**
 
 ```
-./run.sh fortigate/fortigate_collect_pm.yml
+./run.sh fortigate/fortigate_collect_pm.yml -i inventory/inventory_fortigate.ini
         ↓
 สร้าง container จาก ansible-env:latest
         ↓
