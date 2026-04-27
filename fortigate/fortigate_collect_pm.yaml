@@ -136,7 +136,7 @@
        dest: "/ansible/fortigate/backup/{{ inventory_hostname }}-config.cfg"
        
    - name: Run Python script
-     ansible.builtin.command: python3 /home/chai/Desktop/ansible/fortigate/process.py {{ inventory_hostname }}
+     ansible.builtin.command: python3 /ansible/fortigate/process.py {{ inventory_hostname }}
      register: result
      run_once: true
      
