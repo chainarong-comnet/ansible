@@ -127,17 +127,17 @@
    - name: Render JSON using Jinja2 template
      template:
        src: fortigate.json.j2
-       dest: "/home/chai/Desktop/ansible/fortigate/report/json/{{ inventory_hostname }}_PM.json"
+       dest: "/ansible/fortigate/report/json/{{ inventory_hostname }}_PM.json"
 
    - name: Generate Report PM
      template:
        src: fortigate.j2
-       dest: "/home/chai/Desktop/ansible/fortigate/report/text/{{ inventory_hostname }}-report.txt"
+       dest: "/ansible/fortigate/report/text/{{ inventory_hostname }}-report.txt"
        
    - name: Save Backup Config
      copy:
        content: '{{ backup_config.meta.raw }}'
-       dest: "/home/chai/Desktop/ansible/fortigate/backup/{{ inventory_hostname }}-config.cfg"
+       dest: "/ansible/fortigate/backup/{{ inventory_hostname }}-config.cfg"
        
    - name: Run Python script
      ansible.builtin.command: python3 /home/chai/Desktop/ansible/fortigate/process.py {{ inventory_hostname }}

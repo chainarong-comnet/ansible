@@ -40,7 +40,7 @@
           Error: {{ task.error }}
           -------------------------
           {% endfor %}
-        dest: "/home/chai/Desktop/ansible/aruba/log/{{ inventory_hostname }}-log-failed.txt"
+        dest: "/ansible/aruba/log/{{ inventory_hostname }}-log-failed.txt"
       when: failed_tasks | length > 0
       
     - name: Stop failed 
@@ -98,4 +98,4 @@
     - name: Generate Report
       template:
         src: arubareport.j2
-        dest: "/home/chai/Desktop/ansible/aruba/report/{{inventory_hostname}}-config.txt"
+        dest: "/ansible/aruba/report/{{inventory_hostname}}-config.txt"

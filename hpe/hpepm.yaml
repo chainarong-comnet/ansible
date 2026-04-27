@@ -294,7 +294,7 @@
     - name: Generate Report
       template:
          src: hpereportedit.j2
-         dest: "/home/chai/Desktop/ansible/hpe/report/text/{{inventory_hostname}}-config.txt"
+         dest: "/ansible/hpe/report/text/{{inventory_hostname}}-config.txt"
       ignore_errors: true 
       
     - name: Generate error log per host
@@ -306,5 +306,5 @@
           Error: {{ task.error }}
           -------------------------
           {% endfor %}
-        dest: "/home/chai/Desktop/ansible/hpe/log/{{ inventory_hostname }}-log-failed.txt"
+        dest: "/ansible/hpe/log/{{ inventory_hostname }}-log-failed.txt"
       when: failed_tasks | length > 0
