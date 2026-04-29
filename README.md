@@ -50,11 +50,6 @@ script จะดำเนินการทุกอย่างอัตโน�
 >>> Docker CE installed: Docker version 29.x.x
 >>> c2 is already in the docker group.
 >>> Docker daemon is accessible.
->>> Cloning https://github.com/chainarong-comnet/ansible.git ...
->>> Building Docker image...
->>> Setting up Docker Compose services...
-
-✅ Setup complete!
 ```
 
 ---
@@ -67,10 +62,26 @@ script จะดำเนินการทุกอย่างอัตโน�
 # หรือรัน command นี้แทนการเปิด terminal ใหม่
 newgrp docker
 ```
+---
+## ขั้นตอนที่ 5 — สั่งรัน script setup.sh อีกครั้งเพื่อให้ clone repo และ build docker image
+
+```bash
+bash setup.sh
+```
+**ระหว่างรันจะเห็น output ประมาณนี้:**
+
+```
+>>> Cloning https://github.com/chainarong-comnet/ansible.git ...
+>>> Building Docker image...
+>>> Setting up Docker Compose services...
+
+✅ Setup complete!
+```
+---
 
 ---
 
-## ขั้นตอนที่ 5 — ทดสอบการติดตั้ง
+## ขั้นตอนที่ 6 — ทดสอบการติดตั้ง
 
 ```bash
 cd ansible
@@ -85,7 +96,14 @@ ansible-playbook [core 2.13.13]
   python version = 3.8.20
   ...
 ```
+---
 
+## ขั้นตอนที่ 7 — ให้สิทธิ์ Script run.sh และรัน script
+
+```bash
+chmod +x run.sh
+```
+---
 
 ## วิธีรัน Playbook
 
@@ -98,19 +116,19 @@ cd ansible
 
 ```bash
 # FortiGate
-./run.sh fortigate/fortigate_collect_pm.yml
+./run.sh -i inventory/inventory_fortigate.ini fortigate/fortigate_collect_pm.yml
 
 # Aruba
-./run.sh aruba/arubapm.yaml
+./run.sh -i inventory/inventory_aruba.ini aruba/arubapm.yaml
 
 # HPE Comware7
-./run.sh hpe/hpepm.yml
+./run.sh -i inventory/inventory_hpe.ini hpe/hpepm.yml
 ```
 
 **Flow การทำงาน:**
 
 ```
-./run.sh fortigate/fortigate_collect_pm.yml -i inventory/inventory_fortigate.ini
+./run.sh -i inventory/inventory_fortigate.ini fortigate/fortigate_collect_pm.yml
         ↓
 สร้าง container จาก ansible-env:latest
         ↓
